@@ -31,7 +31,7 @@ define stream RawMaterialStream(name string, supplier string, amount double);
   
 @primaryKey('name')
 @index('supplier')
-@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/SweetFactoryDB?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/tp1?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
 define table ShipmentDetails(name string, supplier string, amount double);
   
 from RawMaterialStream
@@ -52,7 +52,7 @@ define stream GetTotalSweetProductionStream (name string, duration string, inter
 define stream HourlyProductionStream(AGG_TIMESTAMP long, name string, totalAmount long);
  
 @index('name')
-@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/SweetFactoryDB?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/tp1?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
 define aggregation SweetProductionAggregation
 from SweetProductionStream
 select name, sum(amount) as totalAmount
