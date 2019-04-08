@@ -8,41 +8,19 @@ docker exec -it mysql bash
 mysql -p    # poderá demorar algum tempo
 
 
-create database SweetFactoryDB;
+create database tp1;
 
 CREATE USER 'pstr-user'@'%' IDENTIFIED BY 'pstr#2019';
 
-# tive alguns problemas com versões do jdbc e mysql e isto resolveu
-ALTER USER 'pstr-user'@'%' IDENTIFIED WITH mysql_native_password BY 'pstr#2019';  
-
-GRANT ALL ON SweetFactoryDB.* TO 'pstr-user'@'%';
+GRANT ALL ON tp1.* TO 'pstr-user'@'%';
 
 FLUSH PRIVILEGES;
-
-CREATE USER 'pstr-user'@'%' IDENTIFIED BY 'pstr#2019';
-
-GRANT ALL ON SweetFactoryDB.* TO 'pstr-user'@'%';
-
-FLUSH PRIVILEGES;
-
-
-#Tentar ligar com workbench tanto em root como pstr-user
-
-
 
 ----WSO2----
 
-docker run -it \
--p 9390:9390 \
--p 9743:9743 \
--p 8280:8280 \
---name wso2sp-editor \
- andrelopes/my-first-repo:wso2sp-editor-original
-
-
+docker run -it -p 9390:9390 -p 9743:9743 -p 8280:8280 --name wso2sp-editor andrelopes/my-first-repo:wso2sp-editor-original
 
 ----EXEMPLOS
-
 
 --Exemplo 1--
 
@@ -61,13 +39,7 @@ select name, supplier, amount
 update or insert into ShipmentDetails
 on ShipmentDetails.name == name;
 
-
-
-
 --Exemplo 2--
-
-
-
 
 @App:name('TotalProductionHistoryApp')
 @source(type = 'http', @map(type = 'json'))
@@ -92,9 +64,6 @@ from GetTotalSweetProductionStream as b join SweetProductionAggregation as a
   per b.interval
 select a.AGG_TIMESTAMP, a.name, a.totalAmount
 insert into HourlyProductionStream;
-
-
-
 
 # Correr localmente e verificar efeitos no mysql
 
