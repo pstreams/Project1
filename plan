@@ -25,7 +25,7 @@ Compute Streams with converted coordinates to cell grids
     Assuming cell 1.1 never changes coordenates, to correlate a given set of 
     coordinates to a cell of resolution N x M meters the following function 
     should be considered:
-    
+
     f(latitude, longitude) = 
     {floor [(latitude - 41.477182778) / N], {floor [(longitude + -74.910592) / M]}
 
@@ -90,4 +90,3 @@ Query 2: Profitable Areas
     In query two we assume a cell size of 250m X 250m, i.e., 
     the area to be considered spans from cell 1.1 to cell 600.600.
     Assuming cell 1.1 remains at the same coordinates
-
