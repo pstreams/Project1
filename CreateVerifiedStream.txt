@@ -1,0 +1,61 @@
+@App:name("FiltrarOutOfBounds")
+@App:description("Description of the plan")
+
+@source( type='kafka',
+         topic.list='debs',
+         partition.no.list='0',
+         threading.option='single.thread',
+         group.id="group",
+         bootstrap.servers='localhost:9092',
+         @map(type='csv') )
+--@info(name = 'input stream') 
+define stream TaxiRidesProductionStream (
+    medallion string,
+    hack_license string,
+    pickup_datetime string,
+    dropoff_datetime string,
+    trip_time_in_secs double,
+    trip_distance double,
+    pickup_longitude double,
+    pickup_latitude double,
+    dropoff_longitude double,
+    dropoff_latitude double,
+    payment_type string,
+    fare_amount double,
+    surcharge double,
+    mta_tax double,
+    tip_amount double,
+    tolls_amount double,
+    total_amount double);
+
+
+define stream FilteredOutOfBounds(    
+    medallion string,
+    hack_license string,
+    pickup_datetime string,
+    dropoff_datetime string,
+    trip_time_in_secs double,
+    trip_distance double,
+    pickup_longitude double,
+    pickup_latitude double,
+    dropoff_longitude double,
+    dropoff_latitude double,
+    payment_type string,
+    fare_amount double,
+    surcharge double,
+    mta_tax double,
+    tip_amount double,
+    tolls_amount double,
+    total_amount double);
+
+from TaxiRidesProductionStream [40.129715978 < pickup_latitude and pickup_latitude < 41.477182778 and -74.910592 < pickup_longitude and pickup_longitude < -73.114792]
+insert into FilteredOutOfBounds;
+
+
+@primaryKey('medallion')
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table CheckedRides(medallion string, pickup_datetime string, dropoff_datetime string, pickup_longitude double, pickup_latitude double);
+
+from FilteredOutOfBounds
+select medallion, pickup_datetime, dropoff_datetime, pickup_longitude, pickup_latitude
+insert into CheckedRides;
