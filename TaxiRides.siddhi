@@ -1,0 +1,93 @@
+@App:name("TaxiRides")
+@App:description("Description of the plan")
+
+/*This is the input stream*/
+@source( type='kafka',
+         topic.list='debs',
+         partition.no.list='0',
+         threading.option='single.thread',
+         group.id="group",
+         bootstrap.servers='localhost:9092',
+         @map(type='csv') )
+define stream TaxiRidesProductionStream (
+    medallion string,
+    hack_license string,
+    pickup_datetime string,
+    dropoff_datetime string,
+    trip_time_in_secs double,
+    trip_distance double,
+    pickup_longitude double,
+    pickup_latitude double,
+    dropoff_longitude double,
+    dropoff_latitude double,
+    payment_type string,
+    fare_amount double,
+    surcharge double,
+    mta_tax double,
+    tip_amount double,
+    tolls_amount double,
+    total_amount double);
+
+/*This stream will have the rides within the established boundary and the locations converted to the grid*/
+define stream FilteredOutOfBounds(    
+    medallion string,
+    hack_license string,
+    pickup_datetime string,
+    dropoff_datetime string,
+    trip_time_in_secs double,
+    trip_distance double,
+    pickup_grid string,
+    dropoff_grid string,
+    payment_type string,
+    fare_amount double,
+    surcharge double,
+    mta_tax double,
+    tip_amount double,
+    tolls_amount double,
+    total_amount double);
+    
+
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@primaryKey('medallion')
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table RidesInGrid(medallion string, pickup_datetime string, dropoff_datetime string, pickup_grid string, dropoff_grid string);
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@primaryKey('route')
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table TenMostFrequent(medallion string, pickup_datetime string, dropoff_datetime string, route string);
+
+/* Query filtering the out of bounds entries and converting them to the grid*/
+from TaxiRidesProductionStream [40.129715978 <= pickup_latitude and pickup_latitude <= 41.477182778 and -74.910592 <= pickup_longitude and pickup_longitude <= -73.114792]
+select medallion, 
+    hack_license,
+    pickup_datetime,
+    dropoff_datetime,
+    trip_time_in_secs,
+    trip_distance,
+    str:concat(convert(math:floor((pickup_latitude - 41.477182778) / 1.3474668 * -300), "string"), ".", convert(math:floor((pickup_longitude + -74.910592) / 1.7958 * 300),"string")) as pickup_grid,
+    str:concat(convert(math:floor((dropoff_latitude - 41.477182778) / 1.3474668 * -300), "string"), ".", convert(math:floor((dropoff_longitude + -74.910592) / 1.7958 * 300),"string")) as dropoff_grid,
+    payment_type,
+    fare_amount,
+    surcharge,
+    mta_tax,
+    tip_amount,
+    tolls_amount,
+    total_amount
+insert into FilteredOutOfBounds;
+
+
+@info(name='all-valid-entries') 
+from FilteredOutOfBounds
+select medallion, pickup_datetime, dropoff_datetime, pickup_grid, dropoff_grid
+insert into RidesInGrid;
+
+
+@info(name='Q1') 
+from FilteredOutOfBounds#window.time(5 sec)
+select medallion, pickup_datetime, dropoff_datetime, str:concat("From: ", pickup_grid," To: ", dropoff_grid) as route
+order by route
+limit 10
+update or insert into TenMostFrequent
+on TenMostFrequent.route == route;
