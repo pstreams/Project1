@@ -56,7 +56,21 @@ define table RidesInGrid(medallion string, pickup_datetime string, dropoff_datet
 /* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
 @primaryKey('route')
 @store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
-define table TenMostFrequent(route string, routeSum long);
+define table TenMostFrequent(route string, route_sum long);
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table Departures(medallion string, pickup_grid string, pickup_datetime string);
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table ProfitableAreas(area string, profit double);
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table AverageProfit(pickup_grid string, avg_area_profit double);
+
+
 
 /* Query filtering the out of bounds entries and converting them to the grid*/
 from TaxiRidesProductionStream [40.129715978 <= pickup_latitude and pickup_latitude <= 41.477182778 and -74.910592 <= pickup_longitude and pickup_longitude <= -73.114792]
@@ -86,19 +100,51 @@ insert into RidesInGrid;
 
 
 @info(name='Q1') 
-from FilteredOutOfBounds#window.timeBatch(10 sec) --change this time don't forget
-select str:concat("From: ", pickup_grid," To: ", dropoff_grid) as route, count(*) as routeSum
+from FilteredOutOfBounds#window.timeBatch(30 sec) --this should be minutes, but seconds for tests
+select str:concat("From: ", pickup_grid," To: ", dropoff_grid) as route, count(*) as route_sum
 group by pickup_grid, dropoff_grid
-order by routeSum desc
+order by route_sum desc
 limit 10
 update or insert into TenMostFrequent
 on TenMostFrequent.route == route;
 
 
 
+@info(name='Q2') 
 
+--stream de profits
+from FilteredOutOfBounds#window.time(15 sec) --this should be minutes, but seconds for tests
+select pickup_grid, avg(fare_amount + tip_amount) as avg_area_profit
+group by pickup_grid
+update or insert into AverageProfit
+on AverageProfit.pickup_grid == pickup_grid;
 
+--stream de chegadas
+from FilteredOutOfBounds#window.time(15 sec) --this should be minutes, but seconds for tests
+select medallion, dropoff_grid, dropoff_datetime
+group by dropoff_grid
+insert into TaxisOnGrid;
 
+--stream/tabela de partidas
+from FilteredOutOfBounds#window.time(15 sec) --this should be minutes, but seconds for tests
+select medallion, pickup_grid , pickup_datetime
+group by pickup_grid
+insert into Departures;
 
+--retirar da stream de chegadas as partidas
+from TaxisOnGrid
+delete Departures
+on medallion == Departures.medallion and dropoff_grid == Departures.pickup_grid;
 
+--contar os taxis que estao em espera
+from TaxisOnGrid
+select medallion, dropoff_grid, count(medallion) as awaiting_taxis
+insert into AwaitingTaxisOnGrid;
+
+--juntar as streams e calcular o profit com base na quantidade de taxis a' espera e no profit medio por viagem na grid
+from AverageProfit#window.time(15 sec) join AwaitingTaxisOnGrid#window.time(15 sec)
+on AverageProfit.pickup_grid == AwaitingTaxisOnGrid.dropoff_grid
+select AverageProfit.pickup_grid as area, AverageProfit.avg_area_profit/AwaitingTaxisOnGrid.awaiting_taxis as profit
+update or insert into ProfitableAreas
+on ProfitableAreas.area == area;
 
