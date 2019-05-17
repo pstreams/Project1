@@ -48,10 +48,12 @@ define stream FilteredOutOfBounds(
     
 
 
-/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
 --@primaryKey('medallion')
+
 @store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
 define table RidesInGrid(medallion string, pickup_datetime string, dropoff_datetime string, pickup_grid string, dropoff_grid string);
+
+
 
 /* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
 @primaryKey('route')
@@ -66,9 +68,27 @@ define table Departures(medallion string, pickup_grid string, pickup_datetime st
 @store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
 define table ProfitableAreas(area string, profit double);
 
-/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
 @store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
 define table AverageProfit(pickup_grid string, avg_area_profit double);
+
+
+
+
+/*
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table TaxiArrivals(medallion string, dropoff_grid string, dropoff_millis long);
+
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table TaxiDepartures(medallion string, pickup_grid string, pickup_millis long);
+*/
+
+
+
+
+
+/* Definition of the table containing all the rides within the specified boundaries and converted to the grid*/
+@store(type='rdbms', jdbc.url="jdbc:mysql://172.17.0.2:3306/TaxiRides?useSSL=false", username="pstr-user", password="pstr#2019" , jdbc.driver.name="com.mysql.jdbc.Driver")
+define table TaxiIdleTime(medallion string, dropoff_time long, pickup_time long, taxi_idle_time long);
 
 
 
@@ -148,3 +168,17 @@ select AverageProfit.pickup_grid as area, AverageProfit.avg_area_profit/Awaiting
 update or insert into ProfitableAreas
 on ProfitableAreas.area == area;
 
+
+
+
+@info(name='Q3')
+-- produzir stream com os tempos em millisegundos
+from FilteredOutOfBounds
+select medallion, time:timestampInMilliseconds(pickup_datetime,'yyyy-MM-dd HH:mm:ss') as pickup_millis, time:timestampInMilliseconds(dropoff_datetime,'yyyy-MM-dd HH:mm:ss') as dropoff_millis
+insert into FilteredTime;
+
+-- procurar todos os registos de taxis que fizeram pickup apos um dropoff
+from every t1 = FilteredTime -> t2 = FilteredTime[t1.medallion == t2.medallion and (t2.pickup_millis - t1.dropoff_millis) > 0]
+select t1.medallion as medallion, t1.dropoff_millis as dropoff_time, t2.pickup_millis as pickup_time, (t2.pickup_millis - t1.dropoff_millis) as taxi_idle_time --calcular o tempo idle entre registos
+having taxi_idle_time > (10 * 1000) -- so' e' registado na tabela caso o tempo ultrapasse o estipulado (10seg aqui)
+insert into TaxiIdleTime;
